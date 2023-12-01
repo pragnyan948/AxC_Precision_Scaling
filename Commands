@@ -1,0 +1,3 @@
+//Commands to source Ananconda from /usr/local/
+source /usr/local/anaconda3/etc/profile.d/conda.sh
+conda activate my-env
