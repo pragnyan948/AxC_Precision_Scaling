@@ -3,7 +3,7 @@ from Utils import import_data
 from Multiple_Linear_Regression import model_fit_linear
 from Logistical_Regression import model_fit_log
 from XGBoost import model_fit_Xg
-preprocessed=1
+preprocessed=0
 def main():
     if not preprocessed:
         Dataset_path_inf = './Data_AxC/EE8351_DATASET_for_Project_inf.csv'

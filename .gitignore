@@ -1,0 +1,6 @@
+# ignore ALL files in ANY directory named temp
+data/
+Data/
+__pycache__
+Figures/
+Outputs/

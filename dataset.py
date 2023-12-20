@@ -53,7 +53,7 @@ def load_dataset(dataset_name):
         transform = transforms.Compose([transforms.ToTensor()])
         data = datasets.SVHN(root='./data', split='train', download=True, transform=transform)
     elif dataset_name.lower() == 'imagenet':
-        imagenet_path = './data/Imagenet/ImageNet-Datasets-Downloader-master/imagenet_images'
+        imagenet_path = './Data/ImageNet-Datasets-Downloader-master/imagenet_images'
         # Define the transform to apply to each image
         transform = transforms.Compose([
             transforms.Resize(256),
