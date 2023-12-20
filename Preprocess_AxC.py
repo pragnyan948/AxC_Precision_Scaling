@@ -1,62 +1,46 @@
 import csv
 import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from model import layer_info
+from Quant import bit_levels, Quant_method, Quant_Stat
+from dataset import datset_stat
+from Utils import import_data, export_data, extract
 
-def import_data(file_path):
-    data_list = []
-    
-    with open(file_path, 'r') as csv_file:
-        csv_reader = csv.DictReader(csv_file)
-        
-        for row in csv_reader:
-            data_list.append(row)
-
-    return data_list
-
-def extract(list_of_dicts):
-    """
-    Extracts all key-value pairs from a list of dictionaries.
-
-    Parameters:
-    - list_of_dicts (list): The input list of dictionaries.
-
-    Returns:
-    - A list of dictionaries where each dictionary contains key-value pairs.
-    """
-    all_values_list = []
-
-    for dictionary in list_of_dicts:
-        all_values_list.append(dictionary.items())
-
-    return all_values_list
-
-def preprocess_data(list_of_dicts):
+def preprocess_data(list_of_dicts, train):
     out=[]
     all_values = extract(list_of_dicts)
     #print("All key-value pairs:")
     #print('[wg prec, dx prec, dw prec, act_type, conv_layers, single_prec, act method, wg method, dx method, dw method, train, ISO accuracy]')
-    out=[["wgprec", "dxprec", "dwprec", "acttype", "convlayers", "singleprec", "actmethod", "wgmethod", "dxmethod", "dwmethod", "train", "ISOaccuracy"]]
+    if train:
+        out=[["wgprec", "dxprec", "dwprec","wgmaxqerr","actmaxqerr","dxmaxqerr","dwmaxqerr","maxds","meands","vards","signds" ,"convlayers", "actlayers", "actmethod", "wgmethod", "dxmethod", "dwmethod", "ISOaccuracy"]]
+    else:
+        out=[["wgprec", "wgmaxqerr","actmaxqerr","maxds","meands","vards","signds" ,"convlayers", "actlayers", "actmethod", "wgmethod", "ISOaccuracy"]]
     for dictionary_items in all_values:
         row=[]
         for key, value in dictionary_items:
             if key.startswith('Dataset#'):
                 Index=value
-                #print(f'{key}: {value}')
+                print(f'{key}: {value}')
             elif key.startswith('Data_'):
-                row=bit_levels(value, row) #row would be appended by [weight/act prec, dx prec, dw prec]
-                row=Quant_Stat(value, row)
+                row=bit_levels(value, row, train) #row would be appended by [weight/act prec, dx prec, dw prec]
+                row=Quant_Stat(value, row, train)
                 #if Index == '93':
                     #import pdb;pdb.set_trace()
                 #print(f'{key}: {value}')
             elif key.startswith('Datas'):
                 row=datset_stat(value,row)  
             elif key.startswith('Algo'):
+                print(f'{key}: {value}')
                 row=layer_info(value,row) #row would be appended by [number_conv_layers,number_act_layers, act_type]
-            elif key.startswith('PE'):
-                row.append(value)
+            #elif key.startswith('PE'):
+                #row.append(value)
             elif key.startswith('Quant'):
-                row=Quant_method(value,row)
-            elif key.startswith('Opti'):
-                row=optim_info(value, row) #row would be appended by [train,res_neuron, res_wg]
+                row=Quant_method(value,row, train)
+            #elif key.startswith('Opti'):
+                #row=optim_info(value, row) #row would be appended by [train]
             elif key.startswith('Iso'):
                 if value.startswith('Y'):
                     row.append('1')
@@ -66,69 +50,10 @@ def preprocess_data(list_of_dicts):
     #import pdb;pdb.set_trace()
     print(np.array(out[0:2]))
     print(len(out))
-    export_data(out)
+    export_data(out, train)
     #import pdb;pdb.set_trace()
     return out
 
-
-
-def bit_levels(value, row):
-    if value.endswith('-bit'):
-        for _ in range(3):
-            row.append(value[0]) #weight/act, dx & dwprecision levels
-    elif value.startswith('INT'):
-        row.append(value[3]) #weight/act precision levels
-        split=value.split('+')
-        #import pdb;pdb.set_trace()
-        #split=value.split(maxsplit=4,'+')
-        if split[2].startswith('FP'):
-            row.append(split[2][2]) # dx precision levels
-            row.append(split[3][-1]) # dw precision levels
-        else:
-            for _ in range(2):
-                row.append(split[2][-1]) # dx & dwprecision levels
-    else:
-        row.append('0')
-    #row would be appended by [weight/act orec, dx prec, dw prec]
-    return row
-
-def layer_info(value,row):
-    if value.startswith('Res'):
-        row.append('RELU')
-        row.append(value.split('-')[1])
-        #import pdb;pdb.set_trace()
-    else:
-        row.append('NA')
-        row.append('0')
-    return row 
-
-
-def Quant_Stat(value, row):
-    return row
-
-def datset_stat(value, row):
-    return row
-
-def Quant_method(value, row):
-    split=value.split('+')
-    for i in range(4):
-        if split[i] == 'DOREFA':
-            row.append('1')
-        elif split[i] == 'FAQ':
-            row.append('2')
-        elif split[i] == 'LSQ_KD':
-            row.append('3')
-        elif split[i] == 'PACT':
-            row.append('4')
-        elif split[i] == 'Radix-4':
-            row.append('5')
-        elif split[i] == 'SWAB':
-            row.append('6')
-        elif split[i] == 'TPR':
-            row.append('7')
-        else:
-            row.append('0')
-    return row
 
 def optim_info(value, row):
     split=value.split('+')
@@ -138,14 +63,40 @@ def optim_info(value, row):
         row.append ('false')
     return row
 
+def transform_X_Y(train):
+    if train:
+        dataset = pd.read_csv('./Data_AxC/Data_train.csv')
+    else:
+        dataset = pd.read_csv('./Data_AxC/Data_inf.csv')
+    dataset.isna().sum()
+    #dataset.info()
+    X = dataset.drop('ISOaccuracy', axis=1)
+    d = {'X': X}
+    print(d)
+    y = dataset['ISOaccuracy']
+    d = {'Y': y}
+    print(d)
 
-def export_data(data_list):
-    # Specify the CSV file path
-    csv_file_path = './Data/Data.csv'
+    # Columns to be moved to the end
+    categorical_features_X = []
 
-    # Writing to the CSV file
-    with open(csv_file_path, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerows(data_list)
+    # Reorder columns by moving specified columns to the end
+    #X = X[[col for col in X.columns if col not in categorical_features_X] + categorical_features_X]
 
-    print(f'The list has been successfully written to {csv_file_path}.')
+    # Display the reordered DataFrame
+    print(X)
+
+    one_hot = OneHotEncoder()
+    transformer = ColumnTransformer([("one_hot",
+                                    one_hot,
+                                    categorical_features_X)],
+                                    remainder="passthrough")
+
+    transformed_X = transformer.fit_transform(X)
+    d = {'X': pd.DataFrame(transformed_X).head()}
+    #print(pd.DataFrame(transformed_X).head())
+    #import pdb;pdb.set_trace()
+
+    X_train, X_test, y_train, y_test = train_test_split(transformed_X, y, test_size = 0.25, random_state = 2)
+
+    return transformed_X, X_train, X_test, y_train, y_test 
